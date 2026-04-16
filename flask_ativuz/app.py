@@ -13,7 +13,7 @@ import subprocess
 import unicodedata
 import uuid
 
-from gerar_contrato import gerar_docx, gerar_termo_quitacao, gerar_notificacao_avalista, gerar_notificacao_inadimplente, gerar_vistoria_entrega, gerar_ordem_servico, nome_arquivo_saida
+from gerar_contrato import gerar_docx, gerar_termo_quitacao, gerar_notificacao_avalista, gerar_notificacao_inadimplente, gerar_ordem_servico, nome_arquivo_saida
 
 app = Flask(__name__)
 app.secret_key = "ativuz-secret-2026"
@@ -476,15 +476,9 @@ def exportar_historico_excel():
     )
 
 
-# ── Vistoria de Entrega ───────────────────────────────────────────────────────
+# ── Vistoria de Entrega (desativada) ─────────────────────────────────────────
 
 VISTORIA_TEMPLATE = DOCX_TEMPLATES / "VISTORIA_TESTE_1.docx"
-
-
-@app.route("/vistoria", methods=["GET"])
-def pagina_vistoria():
-    template_ok = VISTORIA_TEMPLATE.exists()
-    return render_template("vistoria.html", active="vistoria", template_ok=template_ok)
 
 
 @app.route("/vistoria", methods=["POST"])
