@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% block title %}Ordem de Serviço — ATIVUZ{% endblock %}
+
+{% block content %}
+<style>
+.sna-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.sna-row:last-child { border-bottom: none; }
+.sna-label { flex: 1; font-size: 0.82rem; color: #374151; }
+.sna-toggle { display: flex; gap: 3px; flex-shrink: 0; }
+.sna-btn {
+  width: 30px; height: 26px;
+  border: 1.5px solid #d1d5db; background: #fff;
+  border-radius: 4px; cursor: pointer;
+  font-weight: 700; font-size: 0.72rem; color: #9ca3af;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.sna-btn:hover { background: #f3f4f6; color: #374151; }
+.sna-s.sna-sel { background: #16a34a; color: #fff; border-color: #16a34a; }
+.sna-n.sna-sel { background: #dc2626; color: #fff; border-color: #dc2626; }
+.sna-a.sna-sel { background: #d97706; color: #fff; border-color: #d97706; }
+.checklist-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 0 1.5rem 1.5rem;
+  gap: 0;
+}
+@media (max-width: 640px) { .checklist-grid { grid-template-columns: 1fr; } }
+.radio-group { display: flex; gap: 1rem; flex-wrap: wrap; }
+.radio-item { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.88rem; }
+.radio-item input[type="radio"] { accent-color: #3b82f6; width: 16px; height: 16px; cursor: pointer; }
+</style>
+
+<div class="page-header">
+  <h1 class="page-title">Ordem de Serviço e Vistoria</h1>
+  <p class="page-sub">Anexo I do Contrato de Locação — preencha e baixe o documento</p>
+</div>
+
+<form action="{{ url_for('processar_ordem_servico') }}" method="post" id="form-os">
+
+  <!-- ── Identificação ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-blue">Identificação</span></h2>
+    </div>
+    <div class="form-grid">
+      <div class="form-group col-2">
+        <label class="form-label" for="cliente">Cliente</label>
+        <input type="text" name="cliente" id="cliente" class="form-input"
+               placeholder="Nome completo do cliente">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="preenchido_por">Preenchido por</label>
+        <input type="text" name="preenchido_por" id="preenchido_por" class="form-input"
+               placeholder="Nome do responsável">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="telefone">Telefone</label>
+        <input type="text" name="telefone" id="telefone" class="form-input"
+               placeholder="(84) 99999-9999">
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label" for="endereco">Endereço</label>
+        <input type="text" name="endereco" id="endereco" class="form-input"
+               placeholder="Rua, número, bairro, cidade/UF">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data</label>
+        <input type="text" class="form-input" id="data-auto" readonly
+               style="color:#64748b; background:#f1f5f9; cursor:default;">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Veículo ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-green">Veículo</span></h2>
+    </div>
+    <div class="form-grid">
+      <div class="form-group col-2">
+        <label class="form-label" for="veiculo">Veículo</label>
+        <input type="text" name="veiculo" id="veiculo" class="form-input"
+               placeholder="Marca/Modelo">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="placa">Placa</label>
+        <input type="text" name="placa" id="placa" class="form-input"
+               placeholder="ABC-1234" style="text-transform:uppercase">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="ano">Ano</label>
+        <input type="text" name="ano" id="ano" class="form-input" placeholder="2020/2021">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="cor">Cor</label>
+        <input type="text" name="cor" id="cor" class="form-input" placeholder="Branca">
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label" for="chassi">Número CHASSI</label>
+        <input type="text" name="chassi" id="chassi" class="form-input"
+               placeholder="9BWZZZ377VT004251">
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label" for="motor">Número Motor</label>
+        <input type="text" name="motor" id="motor" class="form-input"
+               placeholder="ABC123456">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="hodometro_entrega">Hodômetro Entrega (km)</label>
+        <input type="text" name="hodometro_entrega" id="hodometro_entrega" class="form-input"
+               placeholder="45000">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="hodometro_retorno">Hodômetro Retorno (km)</label>
+        <input type="text" name="hodometro_retorno" id="hodometro_retorno" class="form-input"
+               placeholder="45500">
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label">Combustível</label>
+        <div class="radio-group" style="padding-top:0.25rem">
+          <label class="radio-item">
+            <input type="radio" name="combustivel" value="MT"> MT (metade)
+          </label>
+          <label class="radio-item">
+            <input type="radio" name="combustivel" value="6/8"> 6/8
+          </label>
+          <label class="radio-item">
+            <input type="radio" name="combustivel" value="TC"> TC (tanque cheio)
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Checklist de Acessórios ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-blue">Acessórios / Checklist</span></h2>
+    </div>
+    <div class="checklist-grid">
+
+      {% set itens = [
+        ('calotas',          'Calotas'),
+        ('buzina',           'Buzina'),
+        ('doc_crlv',         'Doc. CRLV'),
+        ('triangulo',        'Triângulo'),
+        ('antena',           'Antena'),
+        ('sensor_re',        'Sensor de ré'),
+        ('som_alto_falante', 'Som/Alto Falante'),
+        ('tapetes',          'Tapetes'),
+        ('limpadores',       'Limpadores'),
+        ('chave_roda',       'Chave de roda'),
+        ('vidros_elet',      'Vidros elét.'),
+        ('oleo_motor',       'Óleo motor'),
+        ('alarme_trava',     'Alarme/Trava'),
+        ('lampadas',         'Lâmpadas'),
+        ('macaco_mec',       'Macaco mec.'),
+        ('estepe',           'Estepe'),
+        ('func_gnv',         'Func. GNV'),
+        ('agua',             'Água'),
+        ('borracha_psg_d',   'Borracha PSG D'),
+        ('borr_mtr',         'Borr. MTR'),
+        ('asa_urubu_dd',     'Asa Urubu DD'),
+        ('asa_urub_td',      'Asa Urub TD'),
+        ('tapete_mala',      'Tapete/Mala'),
+        ('tampa_prx',        'Tampa Prx'),
+        ('borracha_psg_t',   'Borracha PSG T'),
+        ('borr_mtr_t',       'Borr. MTR T'),
+        ('asa_urubu_de',     'Asa Urubu DE'),
+        ('asa_urub_te',      'Asa Urub TE'),
+        ('bagagito',         'Bagagito'),
+        ('linguet',          'Linguet.'),
+      ] %}
+
+      {% for key, label in itens %}
+      <div class="sna-row">
+        <span class="sna-label">{{ label }}</span>
+        <div class="sna-toggle">
+          <button type="button" class="sna-btn sna-s" onclick="setSNA(this,'{{ key }}','S')">S</button>
+          <button type="button" class="sna-btn sna-n" onclick="setSNA(this,'{{ key }}','N')">N</button>
+          <button type="button" class="sna-btn sna-a" onclick="setSNA(this,'{{ key }}','A')">A</button>
+        </div>
+        <input type="hidden" name="{{ key }}" id="hid_{{ key }}" value="">
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+  <!-- ── Observações / Sintomas ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-red">Observações</span></h2>
+    </div>
+    <div class="form-grid">
+      <div class="form-group col-2">
+        <label class="form-label" for="observacoes">Observações gerais</label>
+        <textarea name="observacoes" id="observacoes" class="form-input" rows="3"
+                  placeholder="Observações gerais..."></textarea>
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label" for="sintomas">Descrição dos sintomas</label>
+        <textarea name="sintomas" id="sintomas" class="form-input" rows="4"
+                  placeholder="Descreva os sintomas detalhadamente..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Assinaturas ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-green">Assinaturas</span></h2>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label" for="assinatura_cliente">Assinatura — Cliente</label>
+        <input type="text" name="assinatura_cliente" id="assinatura_cliente" class="form-input"
+               placeholder="Nome legível do cliente">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="assinatura_func">Assinatura — Funcionário</label>
+        <input type="text" name="assinatura_func" id="assinatura_func" class="form-input"
+               placeholder="Nome legível do funcionário">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Ação ── -->
+  <div class="form-actions">
+    <button type="button" class="btn btn-primary btn-lg" id="btn-pdf" onclick="gerarOS('pdf')">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+           viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Gerar OS (PDF)
+    </button>
+    <button type="button" class="btn btn-secondary btn-lg" id="btn-docx" onclick="gerarOS('docx')">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+           viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/></svg>
+      Baixar DOCX
+    </button>
+  </div>
+
+</form>
+
+<script>
+(function() {
+  const now  = new Date();
+  const dd   = String(now.getDate()).padStart(2,'0');
+  const mm   = String(now.getMonth()+1).padStart(2,'0');
+  const yyyy = now.getFullYear();
+  document.getElementById('data-auto').value = `${dd}/${mm}/${yyyy}`;
+})();
+
+function setSNA(btn, campo, valor) {
+  const toggle = btn.closest('.sna-toggle');
+  toggle.querySelectorAll('.sna-btn').forEach(b => b.classList.remove('sna-sel'));
+  btn.classList.add('sna-sel');
+  document.getElementById('hid_' + campo).value = valor;
+}
+
+async function gerarOS(formato) {
+  const form    = document.getElementById('form-os');
+  const btnPdf  = document.getElementById('btn-pdf');
+  const btnDocx = document.getElementById('btn-docx');
+  const btn     = formato === 'docx' ? btnDocx : btnPdf;
+  const orig    = btn.innerHTML;
+
+  btnPdf.disabled  = true;
+  btnDocx.disabled = true;
+  btn.innerHTML = `
+    <svg class="spin" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+         viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    Gerando...`;
+
+  try {
+    const fd = new FormData(form);
+    fd.set('formato', formato);
+    const resp = await fetch('{{ url_for("processar_ordem_servico") }}', {
+      method: 'POST',
+      body: fd,
+    });
+    const ct = resp.headers.get('content-type') || '';
+    if (!resp.ok || resp.redirected || ct.includes('text/html')) {
+      window.location.href = resp.url;
+      return;
+    }
+    const data = await resp.json();
+    if (data.error) { alert(data.error); return; }
+    window.location.href = data.download_url;
+  } catch (_) {
+    alert('Erro de conexão. Tente novamente.');
+  } finally {
+    btnPdf.disabled  = false;
+    btnDocx.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+</script>
+{% endblock %}

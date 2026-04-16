@@ -335,6 +335,135 @@ def gerar_notificacao_avalista(
                     z.write(arquivo, arquivo.relative_to(tmp))
 
 
+def gerar_vistoria(dados, caminho_saida: str, template_path: str) -> None:
+    """Preenche o template .xlsx de vistoria preservando a formatação original."""
+    import openpyxl
+    import unicodedata as _uni
+
+    def _norm(s: str) -> str:
+        s = _uni.normalize("NFD", str(s).lower())
+        return "".join(c for c in s if _uni.category(c) != "Mn")
+
+    template = Path(template_path)
+    if not template.exists():
+        raise FileNotFoundError(f"Template não encontrado: {template}")
+
+    wb = openpyxl.load_workbook(str(template))
+    agora = datetime.now()
+
+    # Campos de texto — ordenados do mais específico ao mais genérico
+    campos_texto = [
+        ("preenchido por",          dados.get("vis_preenchido_por", "")),
+        ("hodometro entrega",       dados.get("vis_hodometro_entrega", "")),
+        ("hodometro retorno",       dados.get("vis_hodometro_retorno", "")),
+        ("luzes do painel",         dados.get("vis_luzes_painel", "")),
+        ("danos ou avarias",        dados.get("vis_danos_internos", "")),
+        ("observacoes gerais",      dados.get("vis_observacoes_gerais", "")),
+        ("descricao dos sintomas",  dados.get("vis_descricao_sintomas", "")),
+        ("cliente",                 dados.get("vis_cliente", "")),
+        ("telefone",                dados.get("vis_telefone", "")),
+        ("endereco",                dados.get("vis_endereco", "")),
+        ("combustivel",             dados.get("vis_combustivel", "")),
+        ("veiculo",                 dados.get("vis_veiculo", "")),
+        ("chassi",                  dados.get("vis_chassi", "")),
+        ("motor",                   dados.get("vis_motor", "")),
+        ("placa",                   dados.get("vis_placa", "")),
+        ("cor",                     dados.get("vis_cor", "")),
+        ("ano",                     dados.get("vis_ano", "")),
+        ("data",                    agora.strftime("%d/%m/%Y %H:%M")),
+    ]
+
+    # Acessórios — (label_norm, valor S/N/A)
+    acessorios = [
+        ("calotas",         dados.get("acc_calotas", "")),
+        ("buzina",          dados.get("acc_buzina", "")),
+        ("doc. crlv",       dados.get("acc_doc_crlv", "")),
+        ("triangulo",       dados.get("acc_triangulo", "")),
+        ("antena",          dados.get("acc_antena", "")),
+        ("sensor de re",    dados.get("acc_sensor_re", "")),
+        ("som",             dados.get("acc_som", "")),
+        ("tapetes",         dados.get("acc_tapetes", "")),
+        ("limpadores",      dados.get("acc_limpadores", "")),
+        ("chave de roda",   dados.get("acc_chave_roda", "")),
+        ("vidros",          dados.get("acc_vidros", "")),
+        ("oleo do motor",   dados.get("acc_oleo_motor", "")),
+        ("alarme",          dados.get("acc_alarme", "")),
+        ("lampadas",        dados.get("acc_lampadas", "")),
+        ("macaco",          dados.get("acc_macaco", "")),
+        ("estepe",          dados.get("acc_estepe", "")),
+        ("gnv",             dados.get("acc_gnv", "")),
+        ("agua",            dados.get("acc_agua", "")),
+        ("borracha psg d",  dados.get("acc_borracha_psg_d", "")),
+        ("borracha mtr d",  dados.get("acc_borracha_mtr_d", "")),
+        ("asa urubu dd",    dados.get("acc_asa_urubu_dd", "")),
+        ("asa urubu td",    dados.get("acc_asa_urubu_td", "")),
+        ("tapete de mala",  dados.get("acc_tapete_mala", "")),
+        ("tampa paraxq",    dados.get("acc_tampa_paraxq", "")),
+        ("borracha psg t",  dados.get("acc_borracha_psg_t", "")),
+        ("borracha mtr t",  dados.get("acc_borracha_mtr_t", "")),
+        ("asa urubu de",    dados.get("acc_asa_urubu_de", "")),
+        ("asa urubu te",    dados.get("acc_asa_urubu_te", "")),
+        ("bagagito",        dados.get("acc_bagagito", "")),
+        ("lingueta",        dados.get("acc_lingueta", "")),
+    ]
+
+    # ── Preencher campos de texto: busca label → escreve célula à direita ────
+    filled_labels: set = set()
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is None:
+                    continue
+                cell_norm = _norm(str(cell.value))
+                for label, valor in campos_texto:
+                    if label in cell_norm and label not in filled_labels and valor:
+                        target = ws.cell(row=cell.row, column=cell.column + 1)
+                        if not target.value or str(target.value).strip() == "":
+                            target.value = valor
+                            filled_labels.add(label)
+                            break
+
+    # ── Preencher acessórios: localiza colunas S/N/A e marca itens ──────────
+    for ws in wb.worksheets:
+        s_col = n_col = a_col = header_row = None
+        for row in ws.iter_rows():
+            for cell in row:
+                if str(cell.value or "").strip().upper() == "S":
+                    nc = ws.cell(row=cell.row, column=cell.column + 1)
+                    ac = ws.cell(row=cell.row, column=cell.column + 2)
+                    if (str(nc.value or "").strip().upper() == "N"
+                            and str(ac.value or "").strip().upper() == "A"):
+                        header_row = cell.row
+                        s_col = cell.column
+                        n_col = cell.column + 1
+                        a_col = cell.column + 2
+                        break
+            if header_row:
+                break
+
+        if not header_row:
+            continue
+
+        col_map = {"S": s_col, "N": n_col, "A": a_col}
+
+        for item_label, valor in acessorios:
+            if not valor or valor.upper() not in col_map:
+                continue
+            for row in ws.iter_rows(min_row=header_row + 1):
+                found = False
+                for cell in row:
+                    if cell.value and item_label in _norm(str(cell.value)):
+                        ws.cell(row=cell.row, column=col_map[valor.upper()], value="X")
+                        found = True
+                        break
+                if found:
+                    break
+
+    saida = Path(caminho_saida)
+    saida.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(saida))
+
+
 def gerar_notificacao_inadimplente(
     locatario_nome: str,
     data_contrato: str,
@@ -401,3 +530,372 @@ def gerar_notificacao_inadimplente(
             for arquivo in tmp.rglob("*"):
                 if arquivo.is_file():
                     z.write(arquivo, arquivo.relative_to(tmp))
+
+def gerar_ordem_servico(dados: dict, caminho_saida: str) -> None:
+    """Gera o Anexo I — Ordem de Serviço e Vistoria inteiramente via python-docx."""
+    from docx import Document
+    from docx.shared import Pt, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+
+    doc = Document()
+
+    for section in doc.sections:
+        section.top_margin    = Cm(1.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin   = Cm(1.5)
+        section.right_margin  = Cm(1.5)
+
+    def _cell_write(cell, text, bold=False, size=9, center=False):
+        para = cell.paragraphs[0]
+        for el in list(para._p):
+            if el.tag in (qn('w:r'), qn('w:hyperlink'), qn('w:ins'), qn('w:del')):
+                para._p.remove(el)
+        if center:
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = para.add_run(text)
+        run.bold = bold
+        run.font.size = Pt(size)
+
+    # ── Títulos ────────────────────────────────────────────────────────────────
+    for text, size, after in [
+        ("Anexo I do Contrato de Locação", 14, 2),
+        ("Ordem de serviço e vistoria",    12, 8),
+    ]:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after  = Pt(after)
+        r = p.add_run(text)
+        r.bold = True
+        r.font.size = Pt(size)
+
+    # ── Tabela de dados (7 linhas × 4 colunas) ─────────────────────────────────
+    tbl = doc.add_table(rows=7, cols=4)
+    tbl.style = 'Table Grid'
+    for row in tbl.rows:
+        for j, cell in enumerate(row.cells):
+            cell.width = Cm(3.5 if j % 2 == 0 else 5.5)
+
+    rows_info = [
+        ("Cliente:",            dados.get("cliente", ""),            "Preenchido por:",    dados.get("preenchido_por", "")),
+        ("Endereço:",           dados.get("endereco", ""),           "Telefone:",          dados.get("telefone", "")),
+        ("Número CHASSI:",      dados.get("chassi", ""),             "Número Motor:",      dados.get("motor", "")),
+        ("Veículo:",            dados.get("veiculo", ""),            "Placa:",             dados.get("placa", "")),
+        ("Ano:",                dados.get("ano", ""),                "Cor:",               dados.get("cor", "")),
+        ("Hodômetro entrega:",  dados.get("hodometro_entrega", ""),  "Hodômetro retorno:", dados.get("hodometro_retorno", "")),
+    ]
+    for i, (l1, v1, l2, v2) in enumerate(rows_info):
+        r = tbl.rows[i]
+        _cell_write(r.cells[0], l1, bold=True)
+        _cell_write(r.cells[1], v1)
+        _cell_write(r.cells[2], l2, bold=True)
+        _cell_write(r.cells[3], v2)
+
+    comb = dados.get("combustivel", "").upper()
+    comb_str = (
+        f"{'[x]' if comb == 'MT'  else '[ ]'} MT   "
+        f"{'[x]' if comb == '6/8' else '[ ]'} 6/8   "
+        f"{'[x]' if comb == 'TC'  else '[ ]'} TC"
+    )
+    r6 = tbl.rows[6]
+    _cell_write(r6.cells[0], "Combustível:", bold=True)
+    _cell_write(r6.cells[1], comb_str)
+    _cell_write(r6.cells[2], "Data:", bold=True)
+    _cell_write(r6.cells[3], dados.get("data", ""))
+
+    # ── Cabeçalho de acessórios ────────────────────────────────────────────────
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(8)
+    p.paragraph_format.space_after  = Pt(4)
+    r1 = p.add_run("Acessórios e equipamentos existentes ")
+    r1.bold = True
+    r1.font.size = Pt(9)
+    r2 = p.add_run("(S - Sim existente; N - Não existente; A - Avariado)")
+    r2.font.size = Pt(9)
+
+    # ── Tabela de acessórios: 15 linhas × 18 colunas (6 itens × 3 S/N/A) ──────
+    itens_acc = [
+        ("Calotas",          "calotas"),
+        ("Buzina",           "buzina"),
+        ("DOC. CRLV",        "doc_crlv"),
+        ("Triângulo",        "triangulo"),
+        ("Antena",           "antena"),
+        ("Sensor ré",        "sensor_re"),
+        ("Som/Alto Falante", "som_alto_falante"),
+        ("Tapetes",          "tapetes"),
+        ("Limpadores",       "limpadores"),
+        ("Chave roda",       "chave_roda"),
+        ("Vidros elét.",     "vidros_elet"),
+        ("Óleo motor",       "oleo_motor"),
+        ("Alarme/Trava",     "alarme_trava"),
+        ("Lâmpadas",         "lampadas"),
+        ("Macaco mec.",      "macaco_mec"),
+        ("Estepe",           "estepe"),
+        ("Func. GNV",        "func_gnv"),
+        ("Água",             "agua"),
+        ("Borracha PSG D",   "borracha_psg_d"),
+        ("Borr. MTR",        "borr_mtr"),
+        ("Asa Urubu DD",     "asa_urubu_dd"),
+        ("Asa Urub TD",      "asa_urub_td"),
+        ("Tapete/Mala",      "tapete_mala"),
+        ("Tampa Prx",        "tampa_prx"),
+        ("Borracha PSG T",   "borracha_psg_t"),
+        ("Borr. MTR T",      "borr_mtr_t"),
+        ("Asa Urubu DE",     "asa_urubu_de"),
+        ("Asa Urub TE",      "asa_urub_te"),
+        ("Bagagito",         "bagagito"),
+        ("Linguet.",         "linguet"),
+    ]
+
+    tbl_acc = doc.add_table(rows=15, cols=18)
+    tbl_acc.style = 'Table Grid'
+    for row in tbl_acc.rows:
+        for cell in row.cells:
+            cell.width = Cm(0.85)
+
+    for g in range(5):
+        nr, sr, cr = g * 3, g * 3 + 1, g * 3 + 2
+        for k in range(6):
+            label, key = itens_acc[g * 6 + k]
+            c0 = k * 3
+
+            mc = tbl_acc.cell(nr, c0)
+            mc.merge(tbl_acc.cell(nr, c0 + 2))
+            _cell_write(mc, label, bold=True, size=7, center=True)
+
+            _cell_write(tbl_acc.cell(sr, c0),     "S", bold=True, size=7, center=True)
+            _cell_write(tbl_acc.cell(sr, c0 + 1), "N", bold=True, size=7, center=True)
+            _cell_write(tbl_acc.cell(sr, c0 + 2), "A", bold=True, size=7, center=True)
+
+            val = dados.get(key, "").upper()
+            _cell_write(tbl_acc.cell(cr, c0),     "[x]" if val == "S" else "[ ]", size=7, center=True)
+            _cell_write(tbl_acc.cell(cr, c0 + 1), "[x]" if val == "N" else "[ ]", size=7, center=True)
+            _cell_write(tbl_acc.cell(cr, c0 + 2), "[x]" if val == "A" else "[ ]", size=7, center=True)
+
+    # ── Página 2 ───────────────────────────────────────────────────────────────
+    doc.add_page_break()
+
+    p = doc.add_paragraph()
+    r = p.add_run("DANOS OU AVARIAS INTERNAS DO VEÍCULO:")
+    r.bold = True
+    r.font.size = Pt(11)
+    for _ in range(4):
+        doc.add_paragraph()
+
+    for heading, key in [("OBSERVAÇÕES:", "observacoes"), ("DESCRIÇÃO DOS SINTOMAS:", "sintomas")]:
+        p = doc.add_paragraph()
+        r = p.add_run(heading)
+        r.bold = True
+        r.font.size = Pt(11)
+        p2 = doc.add_paragraph()
+        p2.add_run(dados.get(key, "")).font.size = Pt(11)
+
+    doc.add_paragraph()
+
+    tbl_sig = doc.add_table(rows=1, cols=2)
+    tbl_sig.style = 'Table Grid'
+    for cell, lbl, key in [
+        (tbl_sig.rows[0].cells[0], "Assinatura cliente:", "assinatura_cliente"),
+        (tbl_sig.rows[0].cells[1], "Assinatura:",         "assinatura_func"),
+    ]:
+        para = cell.paragraphs[0]
+        r1 = para.add_run(lbl + " [ ] ")
+        r1.bold = True
+        r1.font.size = Pt(11)
+        r2 = para.add_run(dados.get(key, ""))
+        r2.font.size = Pt(11)
+
+    out = Path(caminho_saida)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(out))
+
+
+def gerar_vistoria_entrega(dados, fotos: list, caminho_saida: str, template_path: str) -> None:
+    """Preenche o template .docx de Vistoria de Entrega com base na estrutura real do arquivo."""
+    import re
+    from docx import Document
+    from docx.shared import Inches
+    from pathlib import Path as _Path
+
+    template = _Path(template_path)
+    if not template.exists():
+        raise FileNotFoundError(f"Template nao encontrado: {template}")
+
+    doc = Document(str(template))
+
+    WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+
+    def _safe_text(s: str) -> str:
+        """Remove caracteres de controle invalidos em XML."""
+        return re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', str(s))
+
+    def _xml_replace_placeholder(element, new_value: str, pattern: str = r'\[\s*\]', count: int = 1) -> bool:
+        """Substitui pattern nos elementos <w:t> filhos de element. Retorna True se substituiu."""
+        replaced = 0
+        for t in element.iter(f'{{{WNS}}}t'):
+            if not t.text:
+                continue
+            new_t, n = re.subn(pattern, _safe_text(new_value), t.text, count=count - replaced)
+            if n:
+                t.text = new_t
+                replaced += n
+                if replaced >= count:
+                    return True
+        return replaced > 0
+
+    def _cell_fill(cell, value: str) -> None:
+        """Substitui o primeiro [ ] na celula via XML."""
+        if re.search(r'\[\s+\]', cell.text):
+            _xml_replace_placeholder(cell._element, value, r'\[\s+\]')
+
+    def _inline_replace(para, value: str) -> bool:
+        """Substitui a primeira ocorrencia de [ ] no paragrafo via XML."""
+        if re.search(r'\[\s+\]', para.text):
+            return _xml_replace_placeholder(para._element, value, r'\[\s+\]')
+        return False
+
+    tbl0 = doc.tables[0]   # campos de texto (7 linhas x 4 colunas)
+    tbl1 = doc.tables[1]   # checklist acessorios (11 linhas x 24 colunas)
+    tbl2 = doc.tables[2]   # assinaturas (1 linha x 2 colunas)
+
+    # ── Tabela 0: campos de texto ─────────────────────────────────────────────
+    # Estrutura: C0=label, C1=valor, C2=label, C3=valor
+    mapa_t0 = [
+        (0, 1, dados.get("cliente", "")),
+        (0, 3, dados.get("preenchido_por", "")),
+        (1, 1, dados.get("endereco", "")),
+        (1, 3, dados.get("tel", "")),
+        (2, 1, dados.get("chassi", "")),
+        (2, 3, dados.get("motor", "")),
+        (3, 1, dados.get("veiculo", "")),
+        (3, 3, dados.get("placa", "")),
+        (4, 1, dados.get("ano", "")),
+        (4, 3, dados.get("cor", "")),
+        (5, 1, dados.get("hodometro_entrega", "")),
+        (5, 3, dados.get("hodometro_retorno", "")),
+        (6, 3, dados.get("data", "")),
+    ]
+    for r, c, valor in mapa_t0:
+        if valor:
+            _cell_fill(tbl0.rows[r].cells[c], valor)
+
+    # ── Combustivel: R6 C1 = "[  ] MT [  ] 6/8 [  ] TC" ────────────────────
+    # O texto pode estar num unico w:t ou fragmentado em varios.
+    # Estrategia 1: regex direta no elemento (texto unido).
+    # Estrategia 2: procura [  ] antes do w:t que contem o combustivel.
+    combustivel = dados.get("combustivel", "").upper()
+    if combustivel in ("MT", "6/8", "TC"):
+        cell_c = tbl0.rows[6].cells[1]
+        pat = r'\[\s+\](\s*' + re.escape(combustivel) + r')'
+        filled = False
+        for t in cell_c._element.iter(f'{{{WNS}}}t'):
+            if t.text and re.search(pat, t.text):
+                t.text = re.sub(pat, lambda m: '[x]' + m.group(1), t.text, count=1)
+                filled = True
+                break
+        if not filled:
+            # Texto fragmentado: acha w:t com combustivel e marca o [  ] anterior
+            wt_list = [t for t in cell_c._element.iter(f'{{{WNS}}}t')]
+            for idx, t in enumerate(wt_list):
+                if t.text and combustivel in t.text.upper():
+                    for prev in reversed(wt_list[:idx]):
+                        if prev.text and re.search(r'\[\s+\]', prev.text):
+                            prev.text = re.sub(r'\[\s+\]', '[x]', prev.text, count=1)
+                            break
+                    break
+
+    # ── Checklist: 30 itens — mapeamento direto (chk_row, S_col, N_col, A_col, chave)
+    # Estrutura VISTORIA_TESTE_1: 15 linhas x 22 colunas
+    #   linhas 0,3,6,9,12: nomes dos itens
+    #   linhas 1,4,7,10,13: labels S/N/A
+    #   linhas 2,5,8,11,14: celulas de checkbox [    ]
+    checklist = [
+        # chk_row, S,  N,  A,  chave
+        (2,  0,  1,  2,  "acc_calotas"),
+        (2,  3,  5,  7,  "acc_buzina"),
+        (2,  8,  9,  10, "acc_doc_crlv"),
+        (2,  11, 12, 13, "acc_triangulo"),
+        (2,  14, 16, 17, "acc_antena"),
+        (2,  18, 20, 21, "acc_sensor_re"),
+        (5,  0,  1,  2,  "acc_som"),
+        (5,  3,  4,  6,  "acc_tapetes"),
+        (5,  8,  9,  10, "acc_limpadores"),
+        (5,  11, 12, 13, "acc_chave_roda"),
+        (5,  14, 16, 17, "acc_vidros"),
+        (5,  18, 20, 21, "acc_oleo_motor"),
+        (8,  0,  1,  2,  "acc_alarme"),
+        (8,  3,  4,  6,  "acc_lampadas"),
+        (8,  8,  9,  10, "acc_macaco"),
+        (8,  11, 12, 13, "acc_estepe"),
+        (8,  14, 16, 17, "acc_gnv"),
+        (8,  18, 20, 21, "acc_agua"),
+        (11, 0,  1,  2,  "acc_borracha_psg_d"),
+        (11, 3,  4,  6,  "acc_borr_mtr"),
+        (11, 8,  9,  10, "acc_asa_urubu_dd"),
+        (11, 11, 12, 13, "acc_asa_urub_td"),
+        (11, 14, 16, 17, "acc_tapete_mala"),
+        (11, 18, 20, 21, "acc_tampa_prx"),
+        (14, 0,  1,  2,  "acc_borracha_psg_t"),
+        (14, 3,  4,  6,  "acc_borr_mtr_t"),
+        (14, 8,  9,  10, "acc_asa_urubu_de"),
+        (14, 11, 12, 13, "acc_asa_urub_te"),
+        (14, 14, 16, 17, "acc_bagagito"),
+        (14, 18, 20, 21, "acc_linguet"),
+    ]
+    sna_col = {"S": 0, "N": 1, "A": 2}
+    for chk_row, s_col, n_col, a_col, key in checklist:
+        val = dados.get(key, "").upper()
+        if val not in ("S", "N", "A"):
+            continue
+        col_map = {"S": s_col, "N": n_col, "A": a_col}
+        target_col = col_map[val]
+        cell = tbl1.rows[chk_row].cells[target_col]
+        # O [    ] pode estar fragmentado em varios w:t; escreve direto na celula
+        for para in cell.paragraphs:
+            para.clear()
+            para.add_run('[x]')
+            break
+
+    # ── Paragrafos soltos: OBSERVACOES e SINTOMAS ─────────────────────────────
+    all_paras = list(doc.paragraphs)
+    for i, para in enumerate(all_paras):
+        heading = para.text.strip().upper()
+        if "OBSERVA" in heading and i + 1 < len(all_paras):
+            obs = dados.get("observacoes", "")
+            if obs:
+                nxt = all_paras[i + 1]
+                if re.search(r'\[\s+\]', nxt.text):
+                    _inline_replace(nxt, obs)
+        elif "SINTOMAS" in heading and i + 1 < len(all_paras):
+            sint = dados.get("sintomas", "")
+            if sint:
+                nxt = all_paras[i + 1]
+                if re.search(r'\[\s+\]', nxt.text):
+                    _inline_replace(nxt, sint)
+
+    # ── Assinaturas (tabela 2, sem placeholder, adiciona texto apos label) ────
+    sig_c = dados.get("assinatura_cliente", "")
+    sig_r = dados.get("assinatura_responsavel", "")
+    if sig_c:
+        tbl2.rows[0].cells[0].paragraphs[0].add_run(f" {sig_c}")
+    if sig_r:
+        tbl2.rows[0].cells[1].paragraphs[0].add_run(f" {sig_r}")
+
+    # ── Fotos logo apos as assinaturas (sem quebra de pagina) ────────────────
+    if fotos:
+        tbl2_element = tbl2._element
+        insert_after = tbl2_element
+        for foto_path in fotos:
+            try:
+                doc.add_picture(str(foto_path), width=Inches(7.5))
+                pic_para = doc.paragraphs[-1]._element
+                pic_para.getparent().remove(pic_para)
+                insert_after.addnext(pic_para)
+                insert_after = pic_para
+            except Exception:
+                pass
+
+    saida = _Path(caminho_saida)
+    saida.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(saida))
