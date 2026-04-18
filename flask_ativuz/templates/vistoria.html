@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Vistoria de Entrega — ATIVUZ{% endblock %}
+
+{% block content %}
+<style>
+.sna-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.sna-row:last-child { border-bottom: none; }
+.sna-label { flex: 1; font-size: 0.82rem; color: #374151; }
+.sna-toggle { display: flex; gap: 3px; flex-shrink: 0; }
+.sna-btn {
+  width: 30px; height: 26px;
+  border: 1.5px solid #d1d5db; background: #fff;
+  border-radius: 4px; cursor: pointer;
+  font-weight: 700; font-size: 0.72rem; color: #9ca3af;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.sna-btn:hover { background: #f3f4f6; color: #374151; }
+.sna-s.sna-sel { background: #16a34a; color: #fff; border-color: #16a34a; }
+.sna-n.sna-sel { background: #dc2626; color: #fff; border-color: #dc2626; }
+.sna-a.sna-sel { background: #d97706; color: #fff; border-color: #d97706; }
+.checklist-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 0 1.5rem 1.5rem;
+  gap: 0;
+}
+@media (max-width: 640px) { .checklist-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="page-header">
+  <h1 class="page-title">Vistoria de Entrega</h1>
+  <p class="page-sub">Ordem de Serviço e Vistoria de Veículo — preencha e baixe o documento</p>
+</div>
+
+<form action="{{ url_for('gerar_vistoria_route') }}" method="post" enctype="multipart/form-data" id="form-vistoria">
+
+  <!-- ── Identificação ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-blue">Dados do Cliente</span></h2>
+    </div>
+    <div class="form-grid">
+      <div class="form-group col-2">
+        <label class="form-label" for="cliente_nome">Cliente</label>
+        <input type="text" name="cliente_nome" id="cliente_nome" class="form-input"
+               placeholder="Nome completo do cliente">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="cliente_telefone">Telefone</label>
+        <input type="text" name="cliente_telefone" id="cliente_telefone" class="form-input"
+               placeholder="(84) 99999-9999">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="preenchido_por">Preenchido por</label>
+        <input type="text" name="preenchido_por" id="preenchido_por" class="form-input"
+               placeholder="Nome do responsável">
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label" for="cliente_endereco">Endereço</label>
+        <input type="text" name="cliente_endereco" id="cliente_endereco" class="form-input"
+               placeholder="Rua, número, bairro, cidade/UF">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Veículo ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-green">Dados do Veículo</span></h2>
+    </div>
+    <div class="form-grid">
+      <div class="form-group col-2">
+        <label class="form-label" for="veiculo">Veículo</label>
+        <input type="text" name="veiculo" id="veiculo" class="form-input"
+               placeholder="Marca/Modelo">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="placa">Placa</label>
+        <input type="text" name="placa" id="placa" class="form-input"
+               placeholder="ABC1D23" style="text-transform:uppercase">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="cor">Cor</label>
+        <input type="text" name="cor" id="cor" class="form-input" placeholder="Prata">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="ano">Ano</label>
+        <input type="text" name="ano" id="ano" class="form-input" placeholder="2022">
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label" for="chassi">Número CHASSI</label>
+        <input type="text" name="chassi" id="chassi" class="form-input"
+               placeholder="9BD158476N0123456">
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label" for="numero_motor">Número Motor</label>
+        <input type="text" name="numero_motor" id="numero_motor" class="form-input"
+               placeholder="131A1000000">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="hodometro_entrega">Hodômetro Entrega</label>
+        <input type="text" name="hodometro_entrega" id="hodometro_entrega" class="form-input"
+               placeholder="45.200 km">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="hodometro_retorno">Hodômetro Retorno</label>
+        <input type="text" name="hodometro_retorno" id="hodometro_retorno" class="form-input"
+               placeholder="—">
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label">Combustível</label>
+        <div style="display:flex; gap:1.5rem; flex-wrap:wrap; padding-top:0.25rem">
+          {% for val, label in [('1/4','1/4'),('MT','MT (metade)'),('3/4','3/4'),('TC','TC (cheio)')] %}
+          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; font-size:0.88rem;">
+            <input type="radio" name="combustivel" value="{{ val }}"
+                   style="accent-color:#3b82f6; width:16px; height:16px; cursor:pointer;">
+            {{ label }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Checklist de Acessórios ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-blue">Acessórios / Checklist</span></h2>
+    </div>
+    <div class="checklist-grid">
+      {% set itens = [
+        ('acc_calotas',          'Calotas'),
+        ('acc_buzina',           'Buzina'),
+        ('acc_doc_crlv',         'DOC. CRLV'),
+        ('acc_triangulo',        'Triângulo Sinaliz.'),
+        ('acc_antena',           'Antena'),
+        ('acc_sensor_re',        'Sensor de Ré'),
+        ('acc_som',              'Som / Alto-falante'),
+        ('acc_tapetes',          'Tapetes'),
+        ('acc_limpadores',       'Limpadores'),
+        ('acc_chave_roda',       'Chave de Roda'),
+        ('acc_vidros_eletricos', 'Vidros Elétricos'),
+        ('acc_oleo_motor',       'Óleo do Motor'),
+        ('acc_alarme',           'Alarme / Travas'),
+        ('acc_lampadas',         'Lâmpadas'),
+        ('acc_macaco',           'Macaco Mecânico'),
+        ('acc_estepe',           'Estepe'),
+        ('acc_gnv',              'Func. GNV'),
+        ('acc_agua',             'Água'),
+        ('acc_borr_psg_dir',     'Borracha PSG Dir.'),
+        ('acc_borr_mtr_dir',     'Borracha MTR Dir.'),
+        ('acc_asa_dd',           'Asa Urubu D.D.'),
+        ('acc_asa_td',           'Asa Urubu T.D.'),
+        ('acc_tapete_mala',      'Tapete de Mala'),
+        ('acc_tampa_parachoque', 'Tampa Para-choque'),
+        ('acc_borr_psg_tras',    'Borracha PSG Tras.'),
+        ('acc_borr_mtr_tras',    'Borracha MTR Tras.'),
+        ('acc_asa_de',           'Asa Urubu D.E.'),
+        ('acc_asa_te',           'Asa Urubu T.E.'),
+        ('acc_bagagito',         'Bagagito'),
+        ('acc_lingueta',         'Lingueta'),
+      ] %}
+      {% for key, label in itens %}
+      <div class="sna-row">
+        <span class="sna-label">{{ label }}</span>
+        <div class="sna-toggle">
+          <button type="button" class="sna-btn sna-s" onclick="setSNA(this,'{{ key }}','S')">S</button>
+          <button type="button" class="sna-btn sna-n" onclick="setSNA(this,'{{ key }}','N')">N</button>
+          <button type="button" class="sna-btn sna-a" onclick="setSNA(this,'{{ key }}','A')">A</button>
+        </div>
+        <input type="hidden" name="{{ key }}" id="hid_{{ key }}" value="">
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Observações ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-red">Observações</span></h2>
+    </div>
+    <div class="form-grid">
+      <div class="form-group col-2">
+        <label class="form-label" for="obs_gerais">Observações Gerais</label>
+        <textarea name="obs_gerais" id="obs_gerais" class="form-input" rows="3"
+                  placeholder="Observações gerais..."></textarea>
+      </div>
+      <div class="form-group col-2">
+        <label class="form-label" for="desc_sintomas">Descrição dos Sintomas</label>
+        <textarea name="desc_sintomas" id="desc_sintomas" class="form-input" rows="4"
+                  placeholder="Descreva os sintomas detalhadamente..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Foto ── -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><span class="section-pill pill-blue">Foto do Veículo</span></h2>
+    </div>
+    <div class="form-grid">
+      <div class="form-group col-2">
+        <label class="form-label" for="foto">Foto (opcional)</label>
+        <input type="file" name="foto" id="foto" class="form-input" accept=".jpg,.jpeg,.png">
+        <span style="font-size:0.78rem; color:#64748b;">JPG ou PNG — inserida ao final do documento.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Ação ── -->
+  <div class="form-actions">
+    <button type="button" class="btn btn-primary btn-lg" id="btn-gerar" onclick="gerarVistoria()">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+           viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Baixar DOCX
+    </button>
+  </div>
+
+</form>
+
+<script>
+function setSNA(btn, campo, valor) {
+  const toggle = btn.closest('.sna-toggle');
+  toggle.querySelectorAll('.sna-btn').forEach(b => b.classList.remove('sna-sel'));
+  btn.classList.add('sna-sel');
+  document.getElementById('hid_' + campo).value = valor;
+}
+
+async function gerarVistoria() {
+  const form = document.getElementById('form-vistoria');
+  const btn  = document.getElementById('btn-gerar');
+  const orig = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML = `
+    <svg class="spin" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+         viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    Gerando...`;
+
+  try {
+    const fd = new FormData(form);
+    const resp = await fetch('{{ url_for("gerar_vistoria_route") }}', {
+      method: 'POST',
+      body: fd,
+    });
+    const ct = resp.headers.get('content-type') || '';
+    if (!resp.ok || resp.redirected || ct.includes('text/html')) {
+      window.location.href = resp.url;
+      return;
+    }
+    const data = await resp.json();
+    if (data.error) { alert(data.error); return; }
+    window.location.href = data.download_url;
+  } catch (_) {
+    alert('Erro de conexão. Tente novamente.');
+  } finally {
+    btn.disabled  = false;
+    btn.innerHTML = orig;
+  }
+}
+</script>
+{% endblock %}
